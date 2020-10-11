@@ -3,6 +3,8 @@ package com.example.demo.utils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
@@ -17,11 +19,16 @@ import java.util.List;
  * @Author: gyzhang
  * @Date: 2020/10/10 17:43
  */
+@Component
 public class ReadTxtFile {
 
     private static Log logger = LogFactory.getLog(ReadTxtFile.class);
 
-    public static final String FILE_PATH = "D:\\ProjectCode\\files\\dataset.txt";
+    public static String FILE_PATH;
+    @Value("${file.path}")
+    private void setFilePath(String filePath) {
+        ReadTxtFile.FILE_PATH = filePath;
+    }
     /**
      * 获取文本内容
      * @return

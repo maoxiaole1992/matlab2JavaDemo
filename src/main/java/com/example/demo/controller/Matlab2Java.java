@@ -45,11 +45,7 @@ public class Matlab2Java {
             e.printStackTrace();
             return ResultData.FAILURE("数据计算过程异常！");
         }
-
     }
 
-    public static void main(String[] args) throws MWException {
-
-    }
 }
 
