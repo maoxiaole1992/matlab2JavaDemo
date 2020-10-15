@@ -24,5 +24,13 @@ public class Constants {
      * 峭度类型，四次方
      */
     public static final String SUM_KURTOSIS_TYPE = "SUM_KURTOSIS_TYPE";
+    /**
+     * 歪度类型，三次方
+     */
+    public static final String SUM_SKEWNESS_TYPE = "SUM_SKEWNESS_TYPE";
+    /**
+     * 方根幅值，二分之一次方
+     */
+    public static final String SUM_SQRT_TYPE = "SUM_SQRT_TYPE";
 
 }

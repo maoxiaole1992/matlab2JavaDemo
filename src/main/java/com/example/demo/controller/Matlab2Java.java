@@ -10,6 +10,7 @@ import com.mathworks.toolbox.javabuilder.MWNumericArray;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import matlab2java.MatlabFunc;
+import org.omg.CORBA.PUBLIC_MEMBER;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.converter.json.GsonBuilderUtils;
@@ -32,6 +33,18 @@ public class Matlab2Java {
     private ScheduleTask4Data scheduleTask4Data;
     @Value("${amp.max.allow:30}")
     private double ampMaxAllow;
+    @Value("${rms.max.allow:30}")
+    private double rmsMaxAllow;
+    @Value("${average.max.allow:30}")
+    private double averageMaxAllow;
+    @Value("${kurtosis.max.allow:2000}")
+    private double kurtosisMaxAllow;
+    @Value("${skewness.max.allow:30}")
+    private double skewnessMaxAllow;
+    @Value("${sqrt.max.allow:20}")
+    private double sqrtMaxAllow;
+    @Value("${pulse.max.allow:30}")
+    private double pulseMaxAllow;
 
     @ApiOperation(value = "傅里叶变换获得频域信息")
     @GetMapping("/getFreqDomain")
@@ -41,9 +54,11 @@ public class Matlab2Java {
         // 初始化matlab函数对象
         MatlabFunc func = new MatlabFunc();
         // 获取原始振动数据
-        Double[] dataArr = scheduleTask4Data.getDataArr();
-        if (null == dataArr) {
+        Double[] dataArr = null;
+        if (null == scheduleTask4Data.getDataArr()) {
             dataArr = ReadTxtFile.getContent();
+        } else {
+            dataArr = scheduleTask4Data.getDataArr().clone();
         }
         try {
             // 数组转换成matlab需要的矩阵
@@ -66,96 +81,77 @@ public class Matlab2Java {
         }
     }
 
-    @ApiOperation(value = "获取峰值（绝对值）")
-    @GetMapping("/getAbsMaxAmp")
-    public ResultData getAbsMaxAmp() {
+    @ApiOperation(value = "获取时域信息")
+    @GetMapping("/getTimeDomain")
+    public ResultData getTimeDomain() {
         try {
-            // 获取原始振动数据
-            Double[] dataArr = scheduleTask4Data.getDataArr();
-            if (null == dataArr) {
+            Double[] dataArr = null;
+            if (null == scheduleTask4Data.getDataArr()) {
                 dataArr = ReadTxtFile.getContent();
+            } else {
+                dataArr = scheduleTask4Data.getDataArr().clone();
             }
-            Arrays.sort(dataArr);
-            // 排序之后最大绝对值在数组第一个和最后一个之间产生
-            double maxData = Math.abs(dataArr[0]);
-            if (maxData < Math.abs(dataArr[dataArr.length - 1])) {
-                maxData = Math.abs(dataArr[dataArr.length - 1]);
+            int[] timeArr = new int[dataArr.length];
+            for (int i = 0; i < dataArr.length; i++) {
+                timeArr[i] = i;
             }
             // 返回结果
             Map map = new HashMap();
-            map.put("ampMaxReal", maxData);
-            map.put("ampMaxAllow", ampMaxAllow);
+            map.put("time", timeArr);
+            map.put("amp", dataArr);
             return ResultData.SUCCESS(map);
         } catch (Exception e) {
             e.printStackTrace();
-            return ResultData.FAILURE("获取峰值过程异常！");
+            return ResultData.FAILURE("获取时域信息过程异常！");
         }
     }
 
-    @ApiOperation(value = "获取均方根值")
-    @GetMapping(value = "/getRmsData")
-    public ResultData getRmsData() {
-        try {
-            // 获取原始振动数据
-            Double[] dataArr = scheduleTask4Data.getDataArr();
-            if (null == dataArr) {
-                dataArr = ReadTxtFile.getContent();
-            }
-            // 求平方和
-            double sum = calculateSum(dataArr, Constants.SUM_SQUARE_TYPE);
-            // 返回结果
-            Map map = new HashMap();
-            map.put("ampRmsReal", String.format("%.2f", Math.sqrt(sum / dataArr.length)));
-            map.put("ampRmsAllow", ampMaxAllow);
-            return ResultData.SUCCESS(map);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResultData.FAILURE("获取均方根值过程异常！");
+    @ApiOperation(value = "获取时域监测指标：峰值、均方根值、平均幅值、峭度")
+    @GetMapping(value = "/getTimeParams")
+    public ResultData getTimeParams() {
+        // 获取原始振动数据
+        Double[] dataArr = null;
+        if (null == scheduleTask4Data.getDataArr()) {
+            dataArr = ReadTxtFile.getContent();
+        } else {
+            dataArr = scheduleTask4Data.getDataArr().clone();
         }
-    }
+        // 1、计算峰值
+        Arrays.sort(dataArr);
+        // 排序之后最大绝对值在数组第一个和最后一个之间产生
+        double absMaxAmp = Math.abs(dataArr[0]);
+        if (absMaxAmp < Math.abs(dataArr[dataArr.length - 1])) {
+            absMaxAmp = Math.abs(dataArr[dataArr.length - 1]);
+        }
+        // 2、获取均方根值
+        double squareSum = calculateSum(dataArr, Constants.SUM_SQUARE_TYPE);
+        // 3、获取平均幅值
+        double absSum = calculateSum(dataArr, Constants.SUM_ABS_TYPE);
+        // 4、获取峭度值
+        double kurtosisSum = calculateSum(dataArr, Constants.SUM_KURTOSIS_TYPE);
+        // 5、获取歪度值
+        double skewnessSum = calculateSum(dataArr, Constants.SUM_SKEWNESS_TYPE);
+        // 6、获取方根幅值
+        double sqrtSum = calculateSum(dataArr, Constants.SUM_SQRT_TYPE);
 
-    @ApiOperation(value = "获取平均幅值（绝对值）")
-    @GetMapping(value = "/getAbsAverageAmp")
-    public ResultData getAbsAverageAmp() {
-        try {
-            // 获取原始振动数据
-            Double[] dataArr = scheduleTask4Data.getDataArr();
-            if (null == dataArr) {
-                dataArr = ReadTxtFile.getContent();
-            }
-            // 求绝对值的和
-            double sum = calculateSum(dataArr, Constants.SUM_ABS_TYPE);
-            // 返回结果
-            Map map = new HashMap();
-            map.put("ampAverageReal", sum / dataArr.length);
-            map.put("ampAverageAllow", ampMaxAllow);
-            return ResultData.SUCCESS(map);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResultData.FAILURE("获取平均幅值过程异常！");
-        }
-    }
-
-    @ApiOperation(value = "获取峭度值")
-    @GetMapping(value = "/getKurtosisData")
-    public ResultData getKurtosisData() {
-        try {
-            // 获取原始振动数据
-            Double[] dataArr = scheduleTask4Data.getDataArr();
-            if (null == dataArr) {
-                dataArr = ReadTxtFile.getContent();
-            }
-            // 求绝对值的和
-            double sum = calculateSum(dataArr, Constants.SUM_KURTOSIS_TYPE);
-            // 返回结果
-            Map map = new HashMap();
-            map.put("ampKurtosisReal", sum / dataArr.length);
-            map.put("ampKurtosisAllow", Math.pow(ampMaxAllow, 4));
-            return ResultData.SUCCESS(map);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResultData.FAILURE("获取峭度值过程异常！");
-        }
+        // 返回结果
+        Map map = new HashMap();
+        map.put("ampMaxReal", String.format("%.2f", absMaxAmp));
+        map.put("ampMaxAllow", ampMaxAllow);
+        map.put("ampRmsReal", String.format("%.2f", Math.sqrt(squareSum / dataArr.length)));
+        map.put("ampRmsAllow", rmsMaxAllow);
+        map.put("ampAverageReal", String.format("%.2f", absSum / dataArr.length));
+        map.put("ampAverageAllow", averageMaxAllow);
+        map.put("ampKurtosisReal", String.format("%.2f", kurtosisSum / dataArr.length));
+        map.put("ampKurtosisAllow", kurtosisMaxAllow);
+        map.put("ampSkewnessReal", String.format("%.2f", skewnessSum / dataArr.length));
+        map.put("ampSkewnessAllow", skewnessMaxAllow);
+        map.put("ampSqrtReal", String.format("%.2f", Math.pow(sqrtSum / dataArr.length, 2)));
+        map.put("ampSqrtAllow", sqrtMaxAllow);
+        // 7、脉冲指标
+        map.put("ampPulseReal", String.format("%.2f", absMaxAmp / (absSum / dataArr.length)));
+        map.put("ampPulseAllow", pulseMaxAllow);
+        return ResultData.SUCCESS(map);
     }
 
     /**
@@ -181,6 +177,18 @@ public class Matlab2Java {
         else if (Constants.SUM_KURTOSIS_TYPE.equals(type)) {
             for (double num : dataArr) {
                 sum += Math.pow(num, 4);
+            }
+        }
+        // 求三次方和
+        else if (Constants.SUM_SKEWNESS_TYPE.equals(type)) {
+            for (double num : dataArr) {
+                sum += Math.pow(num, 3);
+            }
+        }
+        // 求二分之一次方和
+        else if (Constants.SUM_SQRT_TYPE.equals(type)) {
+            for (double num : dataArr) {
+                sum += Math.sqrt(Math.abs(num));
             }
         }
         return sum;
